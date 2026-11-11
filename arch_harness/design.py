@@ -2,7 +2,8 @@
 
 Format (see docs/design-md.md): a level-1 title, then level-2 sections. `Site`, `Constraints` and `Parameters`
 hold `- key: value` bullets; `Programme` holds a Markdown table (Room | Area m² | Count | Storey); `Variants`
-holds level-3 headings, each with `- key: value` overrides. `Brief` and `Ideas` are free text for the agent.
+holds level-3 headings, each with `- key: value` overrides. `Adjacency` holds `- Room: other room` lines (or
+`entrance`): rooms the architect wants next to each other. `Brief` and `Ideas` are free text for the agent.
 Lengths are written with a unit (`m` or `mm`) and stored as integer millimetres: one unit in the model.
 """
 from __future__ import annotations
@@ -81,6 +82,15 @@ def _variants(lines: list[str]) -> dict[str, dict]:
     return out
 
 
+def _adjacency(lines: list[str]) -> list[dict]:
+    out = []
+    for line in lines:
+        m = re.match(r"^\s*-\s*(.+?)\s*:\s*(.+?)\s*$", line)
+        if m:
+            out.append({"room": m.group(1), "next_to": m.group(2)})
+    return out
+
+
 def parse_design(text: str) -> dict:
     title, sec = _sections(text)
     for required in ("site", "programme"):
@@ -99,6 +109,7 @@ def parse_design(text: str) -> dict:
         "parameters": _bullets(sec.get("parameters", [])),
         "ideas": "\n".join(sec.get("ideas", [])).strip(),
         "variants": _variants(sec.get("variants", [])),
+        "adjacency": _adjacency(sec.get("adjacency", [])),
     }
 
 

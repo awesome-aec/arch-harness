@@ -46,6 +46,8 @@ def tiny_model():
              "thickness": 115, "height": 3000, "external": False},
             {"id": "L0-W02", "storey": "L0", "x0": 4115, "y0": 5057, "x1": 8115, "y1": 5057,
              "thickness": 115, "height": 3000, "external": False},
+            {"id": "L0-W09", "storey": "L0", "x0": 0, "y0": 6672, "x1": 8115, "y1": 6672,
+             "thickness": 115, "height": 3000, "external": False},  # the corridor's far side, 1500 mm clear
         ],
         "doors": [
             {"id": "L0-D01", "storey": "L0", "wall": "L0-W01", "offset": 1500, "width": 900, "height": 2050,

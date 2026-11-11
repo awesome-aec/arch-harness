@@ -3,12 +3,15 @@
 The section is double-loaded: a straight corridor with rooms on both sides, the core ('each' rooms) at the west
 end of every storey so it stacks. The footprint is the buildable area (site minus the MBO § 6 Abstandsfläche for
 the building height) shortened to the length the programme needs; storeys are the fewest that hold the
-programme within max_storeys. A wall stops at the underside of the slab above it (storey height minus slab). What does not fit is left out and said in `notes`: the rules then report it.
+programme within max_storeys. The south strip is `room_depth` deep, the north strip `room_depth_north` (the same
+unless stated); with two depths each room but the core takes first the side that makes it squarer. `order` (room names, comma
+separated, one room per mention) places those rooms first; the rest follow in programme order. A wall stops at the underside of the slab above it (storey height minus slab). What does not fit is left out and said in `notes`: the rules then report it.
 """
 from __future__ import annotations
 
 import math
 
+from ..codes import MIN_CLEAR_BETWEEN_WALLS
 from ..codes import abstandsflaeche as setback  # the rule in rules/ checks the same function
 
 GENERATOR = {"name": "massing-double-loaded", "version": "0.1"}
@@ -19,23 +22,36 @@ DEFAULTS = {"max_storeys": 3, "storey_height": 3200, "corridor_width": 1500, "do
 STEP = 100  # room widths and building length snap to 100 mm
 
 
-def _instances(design: dict, n_storeys: int) -> list[dict]:
+def _depths(p: dict) -> tuple[int, int]:
+    return p["room_depth"], p.get("room_depth_north", p["room_depth"])
+
+
+def _instances(design: dict, n_storeys: int, order: str = "") -> list[dict]:
     each, fixed, anywhere = [], [], []
     for entry in design["programme"]:
         if entry["storey"] == "each":
             for st in range(n_storeys):
                 for _ in range(entry["count"]):
-                    each.append({"name": entry["name"], "area_m2": entry["area_m2"], "storey": st})
+                    each.append({"name": entry["name"], "area_m2": entry["area_m2"], "storey": st, "each": True})
         else:
             target = fixed if entry["storey"].isdigit() else anywhere
             for _ in range(entry["count"]):
                 st = int(entry["storey"]) if entry["storey"].isdigit() else None
                 target.append({"name": entry["name"], "area_m2": entry["area_m2"], "storey": st})
-    return each + fixed + anywhere
+    rest = fixed + anywhere   # fixed before any storey, programme order
+    ordered = []
+    for name in (n.strip() for n in str(order or "").split(",") if n.strip()):
+        room = next((r for r in rest if r["name"] == name), None)   # one room per mention
+        if room is not None:
+            rest.remove(room)
+            ordered.append(room)
+    return each + ordered + rest
 
 
-def _room_width(area_m2: float, depth: int) -> int:
-    return math.ceil(area_m2 * 1e6 / depth / STEP) * STEP
+def _room_width(area_m2: float, depth: int, max_ratio: float | None = None) -> int:
+    """The width that gives the area at this depth; with a ratio cap in the brief, never narrower than depth / cap."""
+    w = math.ceil(area_m2 * 1e6 / depth / STEP) * STEP
+    return max(w, math.ceil(depth / max_ratio / STEP) * STEP) if max_ratio else w
 
 
 def _assign(rooms: list[dict], n_storeys: int, inner_length: int, p: dict):
@@ -43,13 +59,17 @@ def _assign(rooms: list[dict], n_storeys: int, inner_length: int, p: dict):
     used = {(st, side): 0 for st in range(n_storeys) for side in (0, 1)}
     strips = {k: [] for k in used}
     unplaced = []
+    depths = _depths(p)
     for room in rooms:
-        w = _room_width(room["area_m2"], p["room_depth"])
+        widths = [_room_width(room["area_m2"], d, p.get("max_room_ratio")) for d in depths]
+        squarer = sorted((0, 1), key=lambda i: max(widths[i], depths[i]) / min(widths[i], depths[i]))
+        sides = (0, 1) if depths[0] == depths[1] or room.get("each") else squarer  # the core stays south-west
         storeys = [room["storey"]] if room["storey"] is not None else range(n_storeys)
         for st in storeys:
             if st >= n_storeys:
                 continue
-            for side in (0, 1):
+            for side in sides:
+                w = widths[side]
                 gap = p["interior_wall"] if strips[(st, side)] else 0
                 if used[(st, side)] + gap + w <= inner_length:
                     used[(st, side)] += gap + w
@@ -65,9 +85,9 @@ def _assign(rooms: list[dict], n_storeys: int, inner_length: int, p: dict):
 
 def generate(design: dict, params: dict) -> dict:
     p = {**DEFAULTS, **params}
-    te, ti, cw, rd = p["exterior_wall"], p["interior_wall"], p["corridor_width"], p["room_depth"]
+    te, ti, cw = p["exterior_wall"], p["interior_wall"], p["corridor_width"]
     sh = p["storey_height"]
-    section = 2 * te + 2 * rd + 2 * ti + cw
+    section = 2 * te + sum(_depths(p)) + 2 * ti + cw
     site = design["site"]
     notes = []
     choice = None
@@ -79,7 +99,7 @@ def generate(design: dict, params: dict) -> dict:
             notes.append(f"{n} storey(s): the double-loaded section needs {section} mm but the buildable depth is "
                          f"{bmax} mm (site depth {site['depth']} mm minus 2 × Abstandsfläche {s} mm)")
             continue
-        rooms = _instances(design, n)
+        rooms = _instances(design, n, p.get("order"))
         strips, unplaced = _assign(rooms, n, lmax - 2 * te, p)
         choice = (n, s, lmax, bmax, rooms, strips, unplaced)
         if not unplaced:
@@ -114,8 +134,8 @@ def generate(design: dict, params: dict) -> dict:
 
 
 def _model(design, p, n, site, bx, by, length, depth, strips, notes) -> dict:
-    te, ti, cw, rd, sh = (p["exterior_wall"], p["interior_wall"], p["corridor_width"], p["room_depth"],
-                          p["storey_height"])
+    te, ti, cw, sh = p["exterior_wall"], p["interior_wall"], p["corridor_width"], p["storey_height"]
+    rd, rdn = _depths(p)
     storeys = [{"id": f"L{i}", "name": f"Storey {i}", "elevation": i * sh, "height": sh} for i in range(n)]
     spaces, walls, doors, slabs = [], [], [], []
     rooms_built = bool(strips)
@@ -146,19 +166,24 @@ def _model(design, p, n, site, bx, by, length, depth, strips, notes) -> dict:
         for side in (0, 1):
             y0 = te if side == 0 else te + rd + 2 * ti + cw
             wall_y = te + rd + ti // 2 if side == 0 else te + rd + ti + cw + ti // 2
+            sd = rd if side == 0 else rdn
             x = te
-            for room in strips.get((i, side), []):
+            strip = strips.get((i, side), [])
+            for j, room in enumerate(strip):
                 k += 1
                 rid = f"{sid}-S{k:02d}"
                 w = room["w"]
+                rest = length - te - (x + w)
+                if j == len(strip) - 1 and rest < ti + MIN_CLEAR_BETWEEN_WALLS:
+                    w += rest   # a rest too narrow to enter goes to the last room, not to a doubled wall
                 spaces.append({"id": rid, "name": room["name"], "programme": room["name"], "storey": sid,
-                               "use": "room", "x": bx + x, "y": by + y0, "w": w, "d": rd})
+                               "use": "room", "x": bx + x, "y": by + y0, "w": w, "d": sd})
                 host = wall(x, wall_y, x + w, wall_y, ti, False)
                 doors.append({"id": f"{sid}-D{k:02d}", "storey": sid, "wall": host["id"],
                               "offset": (w - p["door_width"]) // 2, "width": p["door_width"],
                               "height": p["door_height"], "space": rid})
                 if x + w + ti <= length - te:   # partition to the next room (or to the empty rest of the strip)
-                    wall(x + w + ti // 2, y0, x + w + ti // 2, y0 + rd, ti, False)
+                    wall(x + w + ti // 2, y0, x + w + ti // 2, y0 + sd, ti, False)
                 x += w + ti
     slabs.append({"id": "ROOF", "storey": f"L{n - 1}", "x": bx, "y": by, "w": length, "d": depth, "z": n * sh,
                   "thickness": p["slab_thickness"], "role": "roof"})
@@ -167,6 +192,6 @@ def _model(design, p, n, site, bx, by, length, depth, strips, notes) -> dict:
         "project": {"name": design["name"]},
         "site": {"width": site["width"], "depth": site["depth"]},
         "building": {"x": bx, "y": by, "w": length, "d": depth, "height": n * sh},
-        "programme": design["programme"], "parameters": p, "notes": notes,
+        "programme": design["programme"], "adjacency": design.get("adjacency", []), "parameters": p, "notes": notes,
         "storeys": storeys, "spaces": spaces, "walls": walls, "doors": doors, "slabs": slabs,
     }

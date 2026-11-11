@@ -4,6 +4,7 @@ Every round, variant and decision is a commit; each variant lives on its own bra
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import shutil
 import subprocess
@@ -111,6 +112,7 @@ def run_study(project, max_rounds: int = 5) -> dict:
         if loop["converged"]:
             ifc = export_ifc(loop["model"], model_dir / "model.ifc")
             entry["cost"] = estimate(ifc, source, outdir=model_dir / "cost")
+            (model_dir / "cost" / "cost.json").write_text(json.dumps(entry["cost"], indent=1, default=str), encoding="utf-8")
             commit(project, f"evaluate {name}: EUR {entry['cost']['grand_total_eur']:,.0f}, "
                             f"{entry['cost']['carbon_kgco2e']:,.0f} kg CO2e (illustrative data)")
         else:

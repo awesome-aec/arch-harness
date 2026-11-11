@@ -4,7 +4,8 @@
   python -m arch_harness demo [--example clinic] [--out build/demo-clinic]   deterministic study, no model, offline
   python -m arch_harness hook <after-step|before-settle|context|fork-variant> --project DIR [--name N]
   python -m arch_harness serve --project DIR                                 MCP server on stdio
-  python -m arch_harness viewer --project DIR [--port 8765]                  live three.js viewer
+  python -m arch_harness viewer --project DIR [--port 8765] [--film F.json]  live three.js viewer; /film replays a film
+  python -m arch_harness film --project DIR [--project DIR2] --target T --out F.json   rounds already run, for a replay
 """
 from __future__ import annotations
 
@@ -66,6 +67,14 @@ def main(argv=None):
     v = sub.add_parser("viewer")
     v.add_argument("--project", default=".")
     v.add_argument("--port", type=int, default=8765)
+    v.add_argument("--film")
+    f = sub.add_parser("film")
+    f.add_argument("--project", action="append", required=True)
+    f.add_argument("--target", required=True)
+    f.add_argument("--title")
+    f.add_argument("--variant")
+    f.add_argument("--final-only", action="store_true")
+    f.add_argument("--out", required=True)
     args = ap.parse_args(argv)
     if args.cmd == "demo":
         return _demo(args)
@@ -93,7 +102,13 @@ def main(argv=None):
         return 0
     if args.cmd == "viewer":
         from .viewer import serve_viewer
-        serve_viewer(args.project, args.port)
+        serve_viewer(args.project, args.port, args.film)
+        return 0
+    if args.cmd == "film":
+        from .film import collect
+        film = collect(args.project, args.target, args.title, args.variant, args.final_only)
+        pathlib.Path(args.out).write_text(json.dumps(film, ensure_ascii=False), encoding="utf-8")
+        print(f"{args.out}: {len(film['takes'])} take(s), {sum(len(t['frames']) for t in film['takes'])} frame(s)")
         return 0
 
 

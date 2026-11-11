@@ -1,6 +1,7 @@
 # local toolchains and environments (project-local, never committed)
 .tools/
 .conda-ah/
+.env-ah/
 node_modules/
 __pycache__/
 *.pyc

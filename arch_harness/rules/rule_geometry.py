@@ -32,3 +32,18 @@ def test_rooms_do_not_overlap(space_pair):
     dy = min(a["y"] + a["d"], b["y"] + b["d"]) - max(a["y"], b["y"])
     if dx > 0 and dy > 0:
         fail(f"spaces {a['id']} and {b['id']} overlap by {dx} × {dy} mm", overlap_m2=dx * dy / 1e6)
+
+
+@pytest.mark.rule(id="geometry/walls-keep-clear", kind="geometry")
+def test_walls_keep_clear(wall_pair):
+    """Geometry sanity (arch-harness): two parallel walls that face each other neither overlap nor stand closer
+    than a door's clear width (DIN 18040-1 4.3.3.2: 90 cm) face to face; a narrower gap is a sliver nobody can
+    enter or build. The generator gives such a rest to the room beside it."""
+    from arch_harness.codes import MIN_CLEAR_BETWEEN_WALLS
+    a, b = wall_pair
+    across = (lambda w: w["y0"]) if a["y0"] == a["y1"] else (lambda w: w["x0"])
+    clear = round(abs(across(a) - across(b)) - (a["thickness"] + b["thickness"]) / 2)
+    if clear < MIN_CLEAR_BETWEEN_WALLS:
+        what = "overlap" if clear < 0 else f"stand {clear} mm apart"
+        fail(f"walls {a['id']} and {b['id']} {what} (at least {MIN_CLEAR_BETWEEN_WALLS} mm clear)",
+             clear_mm=clear, required_mm=MIN_CLEAR_BETWEEN_WALLS)

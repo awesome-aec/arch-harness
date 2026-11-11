@@ -120,3 +120,74 @@ def test_abstandsflaeche_rounds_up_like_the_generator(model, write_model):
     model["building"]["x"] = 3997
     [f] = failures(run_rules(write_model(model)), "MBO/6(5)/abstandsflaeche-on-plot")
     assert f["data"]["required"] == 3998
+
+
+def test_parallel_walls_closer_than_a_door_fail_geometry(model, write_model):
+    """A partition 300 mm in front of another wall leaves a sliver nobody can enter: geometry fails."""
+    model["walls"].append({"id": "L0-W03", "storey": "L0", "x0": 0, "y0": 5472, "x1": 4000, "y1": 5472,
+                           "thickness": 115, "height": 3000, "external": False})
+    report = run_rules(write_model(model))
+    [f] = failures(report, "geometry/walls-keep-clear")
+    assert f["element"] == "L0-W01|L0-W03" and f["data"]["clear_mm"] == 300
+
+
+def test_overlapping_parallel_walls_fail_geometry(model, write_model):
+    model["walls"].append({"id": "L0-W03", "storey": "L0", "x0": 2000, "y0": 5057, "x1": 3000, "y1": 5057,
+                           "thickness": 115, "height": 3000, "external": False})
+    report = run_rules(write_model(model))
+    assert [f["element"] for f in failures(report, "geometry/walls-keep-clear")] == ["L0-W01|L0-W03"]
+
+
+def test_a_room_longer_than_the_briefs_ratio_fails(model, write_model):
+    model["parameters"]["max_room_ratio"] = 2
+    model["spaces"][0].update(w=2000, d=5000)  # 2.5 : 1
+    report = run_rules(write_model(model))
+    assert [f["element"] for f in failures(report, "brief/room-proportion")] == ["L0-S01"]
+    # the rule states its label once, with the brief's own number filled in
+    assert {r["label"] for r in report["results"] if r["rule"] == "brief/room-proportion"} == {"No room longer than 2 : 1"}
+
+
+def test_brief_rules_without_a_brief_statement_do_not_run(model, write_model):
+    """No ratio and no adjacency in the brief: those rules check nothing and are not reported (not unconfirmed)."""
+    report = run_rules(write_model(model))
+    assert not {"brief/room-proportion", "brief/adjacency"} & {r["rule"] for r in report["results"]}
+    assert report["passed"] is True
+
+
+def test_adjacency_from_the_brief(model, write_model):
+    """Room A and Room B share a partition: adjacent. Room A is not at the entrance end (x 0 is, after the wall)."""
+    model["parameters"]["exterior_wall"] = 0
+    model["building"]["x"] = 0
+    model["adjacency"] = [{"room": "Room A", "next_to": "Room B"}, {"room": "Room B", "next_to": "entrance"}]
+    report = run_rules(write_model(model))
+    assert [f["element"] for f in failures(report, "brief/adjacency")] == ["Room B#1 next to entrance"]
+
+
+def test_an_adjacency_naming_no_programme_room_fails_instead_of_dropping_out(model, write_model):
+    """A misspelled room in the Adjacency section is a failure, never a rule that silently checks nothing."""
+    model["adjacency"] = [{"room": "Waiting", "next_to": "entrance"}, {"room": "Room A", "next_to": "Lobby"}]
+    report = run_rules(write_model(model))
+    assert {f["element"] for f in failures(report, "brief/adjacency")} == {"Room A#1 next to Lobby", "Waiting#1 next to entrance"}
+
+
+def test_an_adjacency_room_that_was_not_placed_fails(model, write_model):
+    """The brief asks for two of a room and only one was built: the second one's adjacency fails, it is not skipped."""
+    model["programme"][0]["count"] = 2
+    model["adjacency"] = [{"room": model["programme"][0]["name"], "next_to": "entrance"}]
+    report = run_rules(write_model(model))
+    assert f"{model['programme'][0]['name']}#2 next to entrance" in [f["element"] for f in failures(report, "brief/adjacency")]
+
+
+def test_a_failing_element_keeps_its_umlaut(model, write_model):
+    """Room names are German as often as not: the failure names 'Büro', not pytest's escaped 'B\\xfcro'."""
+    model["adjacency"] = [{"room": "Büro", "next_to": "entrance"}]
+    report = run_rules(write_model(model))
+    assert [f["element"] for f in failures(report, "brief/adjacency")] == ["Büro#1 next to entrance"]
+
+
+def test_a_room_far_above_its_programme_area_fails_when_the_brief_caps_it(model, write_model):
+    model["parameters"]["max_room_oversize"] = 1.25
+    model["spaces"][0].update(w=6000, d=5000)  # 30 m² for a 20 m² room: 1.5 ×
+    report = run_rules(write_model(model))
+    [f] = failures(report, "brief/room-not-oversized")
+    assert f["element"] == "L0-S01" and f["data"] == {"actual_m2": 30.0, "max_m2": 25.0}

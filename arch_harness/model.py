@@ -58,6 +58,16 @@ def validate_model(model: dict) -> None:
     check(model, schema, "model")
 
 
+def required_rooms(model: dict) -> list[tuple[str, int, float]]:
+    """Programme instances (name, k, area): storey 'each' means the count per storey."""
+    out = []
+    n_storeys = max(len(model.get("storeys", [])), 1)
+    for entry in model.get("programme", []):
+        count = entry["count"] * (n_storeys if entry["storey"] == "each" else 1)
+        out += [(entry["name"], k, entry["area_m2"]) for k in range(1, count + 1)]
+    return out
+
+
 def storey_z(model: dict) -> dict[str, int]:
     return {s["id"]: s["elevation"] for s in model["storeys"]}
 

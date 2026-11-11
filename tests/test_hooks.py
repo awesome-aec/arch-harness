@@ -30,7 +30,12 @@ def test_after_step_runs_the_rules_and_records_a_round(project):
     step = hooks.after_step(project)
     assert step["round"] == 1 and step["passed"] is False
     assert "DIN18040-1/4.3.3.2/door-clear-width" in step["text"]
-    assert json.loads((project / "model" / "rounds" / "round-01.json").read_text())["passed"] is False
+    record = json.loads((project / "model" / "rounds" / "round-01.json").read_text())
+    assert record["passed"] is False
+    # every rule with its counts, so a reader can show which guardrails a round met and which it hit
+    assert record["rules"]["DIN18040-1/4.3.3.2/door-clear-width"]["failed"] > 0
+    assert record["rules"]["geometry/rooms-do-not-overlap"] == {"kind": "geometry", "passed": record["rules"]["geometry/rooms-do-not-overlap"]["passed"], "failed": 0}
+    assert record["rules"]["brief/room-exists-at-area"]["label"] == "Every room at its programme area"
 
 
 def test_before_settle_blocks_while_rules_fail_then_releases(project):

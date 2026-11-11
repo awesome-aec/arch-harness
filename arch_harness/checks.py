@@ -66,6 +66,18 @@ def next_round(rounds_dir) -> int:
     return max(numbers, default=0) + 1
 
 
+def rule_counts(report: dict) -> dict:
+    """Every rule with its kind, its label if it states one, and how many of its checks passed and failed (an error counts as failed)."""
+    out = {}
+    for r in report["results"]:
+        c = out.setdefault(r["rule"], {"kind": r["kind"], "passed": 0, "failed": 0, **({"label": r["label"]} if r.get("label") else {})})
+        if r["outcome"] == "passed":
+            c["passed"] += 1
+        elif r["outcome"] in ("failed", "error"):
+            c["failed"] += 1
+    return dict(sorted(out.items()))
+
+
 def write_round(rounds_dir, report: dict, params: dict, revisions: list, **extra) -> dict:
     """Build the round record (the one shape) and write it as the next round-NN.json; return it."""
     rounds_dir = pathlib.Path(rounds_dir)
@@ -75,6 +87,6 @@ def write_round(rounds_dir, report: dict, params: dict, revisions: list, **extra
               "by_kind": report["by_kind"], "unconfirmed_kinds": report["unconfirmed_kinds"],
               "unconfirmed_rules": report["unconfirmed_rules"],
               "failures": [{k: f[k] for k in ("rule", "kind", "element", "message")} for f in failures(report)],
-              "revisions": revisions, **extra}
+              "rules": rule_counts(report), "revisions": revisions, **extra}
     (rounds_dir / f"round-{n:02d}.json").write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n")
     return record

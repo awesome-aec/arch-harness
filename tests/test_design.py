@@ -48,3 +48,13 @@ def test_missing_site_is_reported(tmp_path):
     p.write_text("# X\n\n## Programme\n| Room | Area m² | Count | Storey |\n|---|---|---|---|\n| A | 10 | 1 | any |\n")
     with pytest.raises(ValueError, match="Site"):
         load_design(p)
+
+
+def test_adjacency_lines_become_pairs():
+    """`## Adjacency` holds `- Room: other room` (or `entrance`): the rooms the architect wants next to each other."""
+    from arch_harness.design import parse_design
+    text = ("# t\n## Site\n- width: 20 m\n- depth: 20 m\n## Programme\n| Room | Area m² | Count | Storey |\n|---|---|---|---|\n"
+            "| Reception and waiting | 60 | 1 | 0 |\n## Adjacency\n- Reception and waiting: entrance\n"
+            "- Accessible WC: Reception and waiting\n")
+    assert parse_design(text)["adjacency"] == [{"room": "Reception and waiting", "next_to": "entrance"},
+                                                {"room": "Accessible WC", "next_to": "Reception and waiting"}]

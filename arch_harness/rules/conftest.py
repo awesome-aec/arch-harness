@@ -12,6 +12,8 @@ import json
 
 import pytest
 
+from arch_harness.model import required_rooms
+
 
 class RuleFailure(AssertionError):
     def __init__(self, message: str, **data):
@@ -35,14 +37,14 @@ def _model(config):
     return config._ah_model
 
 
-def required_rooms(model):
-    """Programme instances: 'Name#k'. Storey 'each' means count per storey."""
-    out = []
-    n_storeys = len(model["storeys"])
-    for entry in model["programme"]:
-        count = entry["count"] * (n_storeys if entry["storey"] == "each" else 1)
-        out += [(entry["name"], k, entry["area_m2"]) for k in range(1, count + 1)]
-    return out
+def parallel_wall_pairs(walls):
+    """Walls on one storey that run the same way and face each other along more than 1 mm of their length."""
+    def along(w):
+        return (w["y0"] == w["y1"], *sorted((w["x0"], w["x1"]) if w["y0"] == w["y1"] else (w["y0"], w["y1"])))
+    for a, b in itertools.combinations(walls, 2):
+        (ha, a0, a1), (hb, b0, b1) = along(a), along(b)
+        if a["storey"] == b["storey"] and ha == hb and min(a1, b1) - max(a0, b0) > 1:
+            yield a, b
 
 
 def pytest_generate_tests(metafunc):
@@ -59,10 +61,32 @@ def pytest_generate_tests(metafunc):
         "space_pair": [((a, b), f"{a['id']}|{b['id']}")
                        for spaces in by_storey.values() for a, b in itertools.combinations(spaces, 2)],
         "required_room": [(r, f"{r[0]}#{r[1]}") for r in required_rooms(m)],
+        "wall_pair": [((a, b), f"{a['id']}|{b['id']}") for a, b in parallel_wall_pairs(m["walls"])],
+        # brief statements: only what the architect wrote is checked
+        "shaped_room": [(s, s["id"]) for s in m["spaces"] if s["use"] == "room"] if "max_room_ratio" in m["parameters"] else [],
+        "sized_room": [(s, s["id"]) for s in m["spaces"] if s["use"] == "room" and s.get("programme")]
+                      if "max_room_oversize" in m["parameters"] else [],
+        # one check per programme instance the line names (one, if it names no programme room: that fails)
+        "adjacent_pair": [((a["room"], k, a["next_to"]), f"{a['room']}#{k} next to {a['next_to']}")
+                          for a in m.get("adjacency", [])
+                          for k in range(1, max(1, sum(r[0] == a["room"] for r in required_rooms(m))) + 1)],
     }
     for name, items in sources.items():
         if name in metafunc.fixturenames:
+            marker = metafunc.definition.get_closest_marker("rule")
+            if not items and marker is not None and marker.kwargs.get("from_brief"):
+                NOT_ASKED.add(metafunc.definition.name)  # the brief states nothing to check: not run, not unconfirmed
             metafunc.parametrize(name, [i[0] for i in items], ids=[i[1] for i in items])
+
+
+NOT_ASKED: set[str] = set()
+
+
+def pytest_collection_modifyitems(config, items):
+    dropped = [i for i in items if i.originalname in NOT_ASKED]
+    if dropped:
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = [i for i in items if i.originalname not in NOT_ASKED]
 
 
 @pytest.fixture
@@ -106,6 +130,7 @@ def pytest_runtest_makereport(item, call):
         "message": message,
         "data": data,
         "source": " ".join((item.function.__doc__ or "").split()),
+        "label": marker.kwargs.get("label", "").format(**_model(item.config)["parameters"]),
     })
 
 
