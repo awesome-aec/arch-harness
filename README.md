@@ -11,6 +11,10 @@ every round. It runs on your own computer; with a local model no design data lea
 
 **Status:** first working demo (v0.0.1). Apache-2.0. An independent open-source project. Contributions from anyone are welcome.
 
+**Who it is for:** architects and small offices who want to develop early design in rounds, on their own computer.
+The engine stays open under Apache-2.0. Setting it up on an office's real project and keeping it running is offered by
+DataDrivenAEC under the name ArchiLoops; nothing in this repository depends on that offer.
+
 ## The three parts
 
 1. **Intent** — `DESIGN.md` ([format](docs/design-md.md)), and the model it produces: `model/model.json` in
