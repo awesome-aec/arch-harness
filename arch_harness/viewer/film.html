@@ -6,8 +6,8 @@
 <title>arch-harness film</title>
 <style>
   /* paper, ink and a white card model; cobalt = met (and the AI's step), vermilion = fails, marker yellow = the architect's critique */
-  :root { --bg: #F3F2EE; --ink: #15171B; --text: #3F434A; --quiet: #6B6F76; --faint: #9A9DA3; --line: #DEDBD3; --card: #FFFFFF;
-          --fail: #D9481F; --pass: #2747E8; --mark: #F5C518; --markwash: #FFE45C; --ai: #2747E8;
+  :root { --bg: #ECEDE9; --ink: #252B30; --text: #434C53; --quiet: #59636B; --faint: #5F6971; --line: #C9CECA; --card: #FAFBF8;
+          --fail: #AE4528; --pass: #285E87; --mark: #E9C45B; --markwash: #F4E3A1; --ai: #4E53A0;
           --serif: ui-serif, "Iowan Old Style", Georgia, serif; --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 16px/1.4 var(--sans); overflow: hidden; }
@@ -15,44 +15,52 @@
   .hud { position: fixed; pointer-events: none; }
   #target { left: 28px; top: 24px; max-width: 520px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
             padding: 12px 18px; box-shadow: 0 8px 24px rgba(21,23,27,.06); transition: opacity .3s; }
-  #target b { display: block; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--quiet); margin-bottom: 2px; }
+  #target b { display: block; font-size: 13px; font-weight: 600; color: var(--quiet); margin-bottom: 2px; }
   #target span { font: 600 20px/1.3 var(--serif); }
-  #ring { left: 50%; top: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
-          background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; font-weight: 700; font-size: 15px;
-          color: var(--quiet); box-shadow: 0 8px 24px rgba(21,23,27,.06); white-space: nowrap; }
-  #ring .it { color: var(--ink); padding: 0 8px 0 4px; min-width: 104px; }
-  #ring .st { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
+  #ring { left: 28px; top: 112px; width: 360px; height: 470px; font-weight: 700; font-size: 15px; color: var(--quiet); transition: opacity .3s; }
+  #ring svg { position: absolute; inset: 0; overflow: visible; }
+  #ring .arc { fill: none; stroke: var(--quiet); stroke-width: 3; stroke-linecap: round; }
+  #ring .chev { fill: var(--quiet); }
+  #ring .feed { stroke: var(--faint); stroke-width: 3; stroke-dasharray: 6 6; marker-end: url(#tipIn); transition: stroke .3s; }
+  #ring.input .feed { stroke: #B8901F; stroke-dasharray: none; }
+  #ring .it { position: absolute; left: 0; top: 0; width: 360px; text-align: center; color: var(--ink); font: 600 17px/1.2 var(--serif); }
+  #ring .st { position: absolute; transform: translate(-50%, -50%); padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line);
+              background: var(--card); white-space: nowrap; box-shadow: 0 4px 12px rgba(37,43,48,.08); }
+  #sGen { left: 180px; top: 70px; } #sCheck { left: 297px; top: 272px; } #sFix { left: 63px; top: 272px; }
+  #ring #count { position: absolute; left: 180px; top: 205px; transform: translate(-50%, -50%); text-align: center; width: 170px; }
+  #ring #exit { position: absolute; left: 180px; top: 298px; transform: translateX(-50%); white-space: nowrap; font-size: 14px; color: var(--pass); opacity: 0; transition: opacity .3s; }
+  #ring.closed #exit { opacity: 1; }
+  #ring #input { position: absolute; left: 180px; top: 420px; transform: translateX(-50%); width: 340px; text-align: center; font-size: 15px; font-weight: 600;
+                 padding: 9px 14px; border-radius: 12px; border: 1px dashed var(--faint); color: var(--quiet); background: var(--card); transition: all .3s; }
+  #ring.input #input { border: 1px solid var(--mark); background: var(--markwash); color: var(--ink); }
   #ring .st.on { background: var(--ink); border-color: var(--ink); color: #fff; }
   #ring .st.on.check-ok { background: var(--pass); border-color: var(--pass); }
   #ring .st.on.arch { background: var(--mark); border-color: var(--mark); color: var(--ink); }
   #ring .st.on.ai { background: var(--ai); border-color: var(--ai); }
   #ring .arr { color: var(--faint); }
-  #count { right: 28px; top: 24px; text-align: right; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
-           padding: 10px 18px 12px; min-width: 210px; box-shadow: 0 8px 24px rgba(21,23,27,.06); }
-  #count .n { font: 700 56px/1 var(--serif); font-variant-numeric: tabular-nums; }
+  #count .n { font: 700 60px/1 var(--serif); font-variant-numeric: tabular-nums; }
   #count .l { font-size: 14px; color: var(--text); margin-top: 4px; }
   #count .k { font-size: 12px; color: var(--quiet); margin-top: 2px; font-variant-numeric: tabular-nums; }
   #count.bad .n { color: var(--fail); } #count.ok .n { color: var(--pass); } #count.idle .n { color: var(--faint); }
-  #caption { left: 50%; bottom: 40px; transform: translateX(-50%); max-width: min(1200px, calc(100% - 56px)); text-align: center;
-             background: rgba(21,23,27,.88); color: #fff; font-size: 26px; line-height: 1.35; padding: 12px 26px; border-radius: 14px; }
+  #caption { left: 50%; bottom: 40px; transform: translateX(-50%); max-width: min(1100px, calc(100% - 56px)); text-align: center; text-wrap: balance;
+             background: rgba(37,43,48,.94); color: #fff; font-size: 26px; line-height: 1.35; padding: 12px 26px; border-radius: 14px; }
   #caption:empty { display: none; }
-  #card { left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; background: var(--card); border: 1px solid var(--line);
-          border-radius: 22px; padding: 34px 48px; max-width: 900px; box-shadow: 0 20px 60px rgba(21,23,27,.12); }
-  #card .eb { font-size: 14px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--fail); margin-bottom: 10px; }
-  #card .h { font: 600 40px/1.2 var(--serif); }
+  #card { left: 48%; top: 50%; transform: translate(-50%, -50%); text-align: center; background: var(--card); border: 1px solid var(--line);
+          border-radius: 22px; padding: 28px 36px; width: 640px; box-shadow: 0 20px 60px rgba(21,23,27,.12); }
+  #card .eb { font-size: 16px; font-weight: 700; color: var(--fail); margin-bottom: 10px; }
+  #card .h { font: 600 34px/1.2 var(--serif); text-wrap: balance; }
   #card .s { font-size: 20px; color: var(--text); margin-top: 12px; }
   #card.low { top: auto; bottom: 36px; transform: translateX(-50%); padding: 18px 40px; }
   #card.low .h { font-size: 32px; }
   #card.ok .eb { color: var(--pass); } #card.arch .eb { color: var(--ink); background: var(--mark); display: inline-block; padding: 1px 8px; } #card.ai .eb { color: var(--ai); }
-  #card table { margin: 16px auto 0; border-collapse: collapse; font-size: 20px; }
+  #card table { margin: 14px auto 0; border-collapse: collapse; font-size: 18px; }
   #card td { padding: 6px 14px; border-top: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
   #card td:first-child { text-align: left; font-weight: 700; }
   .hide { opacity: 0; }
-  #mark { left: 28px; bottom: 16px; font-size: 13px; color: var(--quiet); }
-  #rails { left: 28px; top: 132px; width: 380px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  #rails { right: 28px; top: 24px; width: 430px; background: var(--card); border: 1px solid var(--line); border-radius: 16px;
            padding: 12px 16px 10px; box-shadow: 0 8px 24px rgba(21,23,27,.06); transition: opacity .3s; }
-  #rails .t { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--quiet); margin-bottom: 6px; }
-  #rails .g { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 8px 0 2px; }
+  #rails .t { font: 600 17px/1.3 var(--serif); color: var(--ink); margin-bottom: 4px; }
+  #rails .g { font-size: 12.5px; font-weight: 700; color: var(--quiet); margin: 9px 0 2px; }
   #rails .r { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; line-height: 1.2; padding: 1.5px 0;
               color: var(--quiet); transition: opacity .2s; }
   #rails .r .v { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -67,13 +75,26 @@
 <body>
 <div id="view"></div>
 <div class="hud" id="target"><b>Target</b><span id="targetText"></span></div>
-<div class="hud" id="ring"><span class="it" id="iter">Iteration 1</span><span class="st" id="sGen">Generate</span><span class="arr">→</span>
-  <span class="st" id="sCheck">Check</span><span class="arr">→</span><span class="st" id="sFix">Fix</span><span class="arr">↻</span></div>
-<div class="hud idle" id="count"><div class="n" id="cN">–</div><div class="l" id="cL">not checked yet</div><div class="k" id="cK"></div></div>
+<div class="hud" id="ring">
+  <svg viewBox="0 0 360 470" width="360" height="470" aria-hidden="true">
+    <defs><marker id="tipIn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#B8901F"/></marker></defs>
+    <path class="arc" d="M 253.5 91.8 A 135 135 0 0 1 308.4 246.7"/>
+    <path class="arc" d="M 280.3 295.3 A 135 135 0 0 1 79.7 295.3"/>
+    <path class="arc" d="M 51.6 246.7 A 135 135 0 0 1 106.5 91.8"/>
+    <path class="chev" d="M 310.5 169.0 L 313.6 150.9 L 296.6 156.9 z"/>
+    <path class="chev" d="M 170.4 340.0 L 186.4 349.0 L 186.4 331.0 z"/>
+    <path class="chev" d="M 55.9 150.9 L 42.1 163.0 L 59.1 169.0 z"/>
+    <line class="feed" x1="180" y1="414" x2="180" y2="352"/>
+  </svg>
+  <span class="it" id="iter">Iteration 1</span>
+  <span class="st" id="sGen">Draw the design</span><span class="st" id="sCheck">Check the rules</span><span class="st" id="sFix">Fix</span>
+  <div class="hud idle" id="count"><div class="n" id="cN">–</div><div class="l" id="cL">not checked yet</div><div class="k" id="cK"></div></div>
+  <div id="exit">✓ loop closes</div>
+  <div id="input">Input: the brief</div>
+</div>
 <div class="hud hide" id="rails"><div class="t">Guardrails from the brief</div><div id="railsList"></div></div>
 <div class="hud" id="caption"></div>
 <div class="hud hide" id="card"><div class="eb" id="cardEb"></div><div class="h" id="cardH"></div><div class="s" id="cardS"></div><table id="cardT"></table></div>
-<div class="hud" id="mark">arch-harness · replay of rounds already run (git history)</div>
 <script type="module">
 import * as THREE from "three";
 
@@ -85,49 +106,52 @@ const film = await (await fetch("/api/film")).json();
 // ---- scene -------------------------------------------------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(capture ? 1 : window.devicePixelRatio);
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
 $("view").appendChild(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0xF3F2EE);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xECEDE9);
 const camera = new THREE.PerspectiveCamera(32, 1, 100, 800000); camera.up.set(0, 0, 1);
-scene.add(new THREE.HemisphereLight(0xffffff, 0xdcdad3, 2.1));
-const sun = new THREE.DirectionalLight(0xffffff, 2.0); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 40;
+const hemi = new THREE.HemisphereLight(0xFFFFFF, 0xC4C9C3, 2.0); hemi.position.set(0, 0, 1); scene.add(hemi);  // Z is up here
+const sun = new THREE.DirectionalLight(0xFFFFFF, 1.7); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0001; sun.shadow.normalBias = 5; sun.shadow.intensity = .3;  // soft contact shade, no hard slabs of shadow
 scene.add(sun); scene.add(sun.target);
-function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.setViewOffset(w, h, -w * .1, 0, w, h); camera.updateProjectionMatrix(); }
+const fill = new THREE.DirectionalLight(0xE5ECF4, .5); scene.add(fill); scene.add(fill.target);  // studio fill, no shadow
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h; camera.setViewOffset(w, h, w * .06, 0, w, h); camera.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
 
 const first = film.takes[0].frames[0];
 const site = first.site;
 const S = Math.max(site.width, site.depth);
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(site.width * 3, site.depth * 3), new THREE.MeshStandardMaterial({ color: 0xF3F2EE, roughness: 1 }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(site.width * 3, site.depth * 3), new THREE.MeshStandardMaterial({ color: 0xECEDE9, roughness: 1 }));
 ground.position.set(site.width / 2, site.depth / 2, -40); ground.receiveShadow = true; scene.add(ground);
-const plot = new THREE.Mesh(new THREE.PlaneGeometry(site.width, site.depth), new THREE.MeshStandardMaterial({ color: 0xD3D0C7, roughness: 1 }));
+const plot = new THREE.Mesh(new THREE.PlaneGeometry(site.width, site.depth), new THREE.MeshStandardMaterial({ color: 0xCDD1CA, roughness: 1 }));
 plot.position.set(site.width / 2, site.depth / 2, -20); plot.receiveShadow = true; scene.add(plot);
 function rectLine(x0, y0, x1, y1, color, dashed) {
   const g = new THREE.BufferGeometry().setFromPoints([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(([x, y]) => new THREE.Vector3(x, y, 5)));
   const m = dashed ? new THREE.LineDashedMaterial({ color, dashSize: S / 60, gapSize: S / 90 }) : new THREE.LineBasicMaterial({ color });
   const l = new THREE.Line(g, m); if (dashed) l.computeLineDistances(); scene.add(l); return l;
 }
-rectLine(0, 0, site.width, site.depth, 0x9A9DA3, false);
+rectLine(0, 0, site.width, site.depth, 0x89928C, false);
 let setbackLine = null, setbackNow = null;
 function setback(sb) {
   if (sb === setbackNow) return; setbackNow = sb;
   if (setbackLine) { scene.remove(setbackLine); setbackLine.geometry.dispose(); }
-  if (sb) setbackLine = rectLine(sb, sb, site.width - sb, site.depth - sb, 0xE4572E, true);
+  if (sb) setbackLine = rectLine(sb, sb, site.width - sb, site.depth - sb, 0xAE4528, true);
 }
-const scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xE4572E, transparent: true, opacity: .16, side: THREE.DoubleSide, depthWrite: false }));
+const scan = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x285E87, transparent: true, opacity: .22, side: THREE.DoubleSide, depthWrite: false }));
 scan.rotation.y = Math.PI / 2; scene.add(scan);
 
-const BASE = { wall: { masonry: 0xFFFFFF, timber: 0xFFFFFF }, door: 0x15171B, slab: 0xF4F4F2, space: 0xC9D3EA };
-const STATE = { fail: new THREE.Color(0xE4572E), met: new THREE.Color(0x2747E8), changed: new THREE.Color(0xF5C518), ai: new THREE.Color(0x2747E8) };
+const BASE = { wall: { masonry: 0xFAFAF7, timber: 0xFAFAF7 }, door: 0x586169, slab: 0xFAFAF7, space: 0xC0CACF };
+const STATE = { fail: new THREE.Color(0xAE4528), met: new THREE.Color(0x285E87), changed: new THREE.Color(0xE9C45B), ai: new THREE.Color(0x4E53A0) };
 const meshes = new Map();
 const EDGE_BOX = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
-const CUT = 1100;  // mm: walls cut at 1.1 m in the end step, so the rooms read from above
-const CAP_PLANE = new THREE.PlaneGeometry(1, 1), CAP = new THREE.MeshBasicMaterial({ color: 0x2B2F38, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });  // drawn over the box top it sits on
-const EDGE = new THREE.LineBasicMaterial({ color: 0x15171B, transparent: true, opacity: .75 });
+const CUT = 2200;  // mm: the end step cuts the top storey at 2.2 m, above the window heads, so its rooms and furniture read from above
+const CUT_COLOUR = 0x4B555D, SLAB_TOP = 0xDDE1DE;  // poché: the wall top is the box's own +Z face (material 4), so no plane floats over it
+const EDGE = new THREE.LineBasicMaterial({ color: 0x505B63 }), EDGE_SOFT = new THREE.LineBasicMaterial({ color: 0xB4BBB8 });
 function meshFor(id) {
   let m = meshes.get(id);
   if (!m) {
-    m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: .8 }));
+    const side = new THREE.MeshStandardMaterial({ color: 0xF4F4F0, roughness: 1, metalness: 0 }), top = side.clone();
+    m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [side, side, side, side, top, side]);  // +X −X +Y −Y +Z −Z
     m.castShadow = true; m.receiveShadow = true; scene.add(m); meshes.set(id, m);
     m.add(new THREE.LineSegments(EDGE_BOX, EDGE));  // drawn in pen: white card on pale paper needs its edges
   }
@@ -178,18 +202,17 @@ function place(mesh, min, max) {
   mesh.scale.set(...size); mesh.position.set(...[0, 1, 2].map(i => min[i] + size[i] / 2));
 }
 function colour(mesh, s, f, state) {
-  const mat = mesh.material, structure = (f && f.parameters.structure) || "masonry";
+  const mat = mesh.material[0], top = mesh.material[4], structure = (f && f.parameters.structure) || "masonry";
   const base = s.kind === "wall" ? BASE.wall[structure] || BASE.wall.masonry : BASE[s.kind] || 0xcccccc;
   // walls read by their cut: the top filled dark (poché), so junctions merge with no seam; doors and slabs stand
   // alone and get the pen line; room tints stay soft
-  mesh.children[0].visible = s.kind === "door" || s.kind === "slab";
-  if (s.kind === "wall" && !mesh.userData.cap) { const c = new THREE.Mesh(CAP_PLANE, CAP); c.position.z = .5005; mesh.add(c); mesh.userData.cap = c; }
-  if (mesh.userData.cap) mesh.userData.cap.visible = s.kind === "wall" && !STATE[state];
-  mat.color.set(base); mat.emissive.set(0); mat.transparent = s.kind === "space"; mat.opacity = s.kind === "space" ? .5 : 1;
-  if (STATE[state]) {
-    mat.color.copy(STATE[state]); mat.emissive.copy(mat.color).multiplyScalar(.25);
-    if (s.kind === "space") mat.opacity = .9;
-  }
+  mesh.children[0].visible = s.kind === "door";  // slab outlines drew a double seam on the facade
+  mesh.castShadow = s.kind !== "space";
+  mat.color.set(base); mat.transparent = false; mat.opacity = 1;
+  if (STATE[state]) mat.color.copy(STATE[state]);
+  const thin = Math.min(mesh.scale.x, mesh.scale.y) <= 500;  // a wall morphing to a new place is briefly a wide box: no dark lid on a room
+  top.color.set(s.kind === "wall" && thin && !STATE[state] ? CUT_COLOUR
+                : s.kind === "slab" && !STATE[state] ? SLAB_TOP : mat.color.getHex());  // slab: white edge in the facade, grey floor on top
 }
 
 // ---- furniture: the last step furnishes the rooms so a viewer reads the space (illustrative, not checked) -------------
@@ -208,7 +231,7 @@ const FURNITURE = [
   [/stair|lift|core/i, (w) => [...Array.from({ length: 11 }, (_, i) => [300 + i * 280, 150, 280, 1200, 175 * (i + 1)]),   // one flight, step by step
                                [w - 2500, 150, 2100, 2100, 1100]]],                                                         // the lift shaft
 ];
-const furnMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: .7 }), furniture = [];
+const furnMat = new THREE.MeshStandardMaterial({ color: 0xF5F5EF, roughness: 1 }), furniture = [];
 let furnishedFor = null;
 function furnish(f) {
   for (const m of furniture) m.visible = false;
@@ -224,9 +247,10 @@ function furnish(f) {
     const south = r.max[1] <= c.min[1] + 1, w = r.max[0] - r.min[0], d = r.max[1] - r.min[1];
     for (const [ax, af, pw, pd, ph] of rule[1](w)) {
       if (ax + pw > w - 100 || af + pd > d - 900) continue;   // keeps a 90 cm way in from the door
-      const x0 = r.min[0] + ax, y0 = south ? r.min[1] + af : r.max[1] - af - pd, z0 = r.min[2] + 20;
+      // the north row stands against its outer wall; the south row, on the camera's side, against the 0.9 m way, or the cut wall hides it
+      const x0 = r.min[0] + ax, y0 = south ? r.max[1] - 900 - af - pd : r.max[1] - af - pd, z0 = r.min[2] + 20;
       const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), furnMat);
-      m.castShadow = m.receiveShadow = true; m.add(new THREE.LineSegments(EDGE_BOX, EDGE));
+      m.castShadow = m.receiveShadow = true; m.add(new THREE.LineSegments(EDGE_BOX, EDGE_SOFT));
       place(m, [x0, y0, z0], [x0 + pw, y0 + pd, z0 + ph]); m.userData.h = ph; m.userData.z0 = z0;
       scene.add(m); furniture.push(m);
     }
@@ -262,7 +286,14 @@ function render3d(s, p) {
     const [zmin, zmax] = z ? [z.min, z.max] : flat(a);
     if (s.kind === "intro") { m.visible = false; continue; }
     const lerp = (u, v) => u.map((x, i) => x + (v[i] - x) * k);
-    place(m, lerp(amin, zmin), lerp(amax, zmax)); m.visible = k > 0 || !!a;
+    const along = q => (q[1][0] - q[0][0]) >= (q[1][1] - q[0][1]);  // runs along x
+    const centre = q => [0, 1].map(i => (q[0][i] + q[1][i]) / 2);
+    const jump = s.kind === "gen" && s.from && a && z && sol.kind === "wall" &&
+      (along([amin, amax]) !== along([zmin, zmax]) || Math.hypot(...centre([amin, amax]).map((c, i) => c - centre([zmin, zmax])[i])) > 1500);
+    if (jump) {  // a wall that moves far sinks where it was and rises where it goes, never sweeping through rooms as a wide box
+      const [lo, hi] = k < .5 ? [amin, amax] : [zmin, zmax], h = Math.abs(1 - 2 * k);
+      place(m, lo, [hi[0], hi[1], lo[2] + Math.max(1, (hi[2] - lo[2]) * h)]); m.visible = true;
+    } else { place(m, lerp(amin, zmin), lerp(amax, zmax)); m.visible = k > 0 || !!a; }
     let st = "base";
     if (s.kind === "gen" && s.from && new Set(s.from.failing).has(id)) st = "changed";  // what the fix was for
     if (s.kind === "check") {
@@ -274,7 +305,7 @@ function render3d(s, p) {
       st = failing.has(id) ? "fail" : prevF && prevF.has(id) ? "met" : "base";
     }
     colour(m, sol, at, st);
-    if (sol.kind === "space" && st !== "base") { m.scale.z = 700; m.position.z += 350; }  // a 5 cm floor would hide behind walls
+    if (sol.kind === "space" && st !== "base") { m.scale.z = 120; m.position.z = sol.min[2] + 60; }  // a flat patch on the floor, read from above
     if (cut > 0 && (sol.kind === "wall" || sol.kind === "door") && sol.min[2] >= topZ) {  // the end step cuts the top storey like a model
       const full = sol.max[2] - sol.min[2], h = full - (full - Math.min(full, CUT)) * cut;
       m.scale.z = h; m.position.z = sol.min[2] + h / 2;
@@ -282,13 +313,14 @@ function render3d(s, p) {
   }
   furnish(s.kind === "end" && !shownStopped() ? at : null); if (s.kind === "end") growFurniture(ease(clamp(p * 3 - .7)));
   scan.visible = s.kind === "check" && !!b && p < .98;
-  if (scan.visible) { scan.scale.set(H * 1.6, b.d + 4000, 1); scan.position.set(sweepX, b.y + b.d / 2, H * .8); }
+  if (scan.visible) { scan.scale.set(H * 1.08, b.d + 1200, 1); scan.position.set(sweepX, b.y + b.d / 2, H * .54); }
   // camera: one slow continuous orbit, a pure function of time
   const tt = s.t0 + p * s.dur, az = -2.0 + .6 * (tt / TOTAL), el = .82;
-  const cx = site.width / 2, cy = site.depth / 2, r = S * 1.45;
+  const cx = site.width / 2, cy = site.depth / 2, r = S * 2.25;
   camera.position.set(cx + r * Math.cos(az) * Math.cos(el), cy + r * Math.sin(az) * Math.cos(el), r * Math.sin(el));
   camera.lookAt(cx, cy, (b ? b.height : 0) * .25);
-  sun.position.set(cx - S, cy - S * 1.4, S * 1.8); sun.target.position.set(cx, cy, 0);
+  sun.position.set(cx - S * .6, cy - S * .9, S * 3.2); sun.target.position.set(cx, cy, 0);
+  fill.position.set(cx + S, cy + S * .5, S); fill.target.position.set(cx, cy, 0);
   const sc = sun.shadow.camera; sc.left = sc.bottom = -S; sc.right = sc.top = S; sc.near = 100; sc.far = S * 6; sc.updateProjectionMatrix();
   renderer.render(scene, camera);
 }
@@ -300,23 +332,27 @@ function lastPrev(s) {
 function hud(s, p) {
   $("targetText").textContent = film.target;
   $("target").classList.toggle("hide", s.kind === "intro");
-  const on = { gen: "sGen", check: "sCheck", fix: "sFix", decision: "sFix", agent: "sFix", stop: s.at && s.at.agent ? "sFix" : "sCheck" }[s.kind];
+  const on = { gen: "sGen", check: "sCheck", fix: "sFix", agent: "sFix", stop: s.at && s.at.agent ? "sFix" : "sCheck" }[s.kind];
   for (const id of ["sGen", "sCheck", "sFix"]) { const e = $(id); e.className = "st" + (id === on ? " on" : ""); }
   if (s.kind === "check" && s.at && !total(s.at) && p > .8) $("sCheck").classList.add("check-ok");
   const byAI = s.kind === "agent" || (s.kind === "stop" && s.at.agent);
-  if (s.kind === "decision") { $("sFix").textContent = "Architect"; $("sFix").classList.add("arch"); }
-  else if (byAI) { $("sFix").textContent = "AI"; $("sFix").classList.add("ai"); }
-  else $("sFix").textContent = (film.takes[s.ti ?? film.takes.length - 1] || film.takes[0]).frames.some(x => x.agent) ? "AI" : "Fix";
+  if (byAI) { $("sFix").textContent = "AI revises"; $("sFix").classList.add("ai"); }
+  else $("sFix").textContent = (film.takes[s.ti ?? film.takes.length - 1] || film.takes[0]).frames.some(x => x.agent) ? "AI revises" : "Fix";
   const parts = several && !options;
   $("iter").textContent = options ? (s.take ? "Option · " + s.take.variant : film.takes.length + " options")
     : parts && s.kind === "decision" && s.added.length ? `Part ${s.ti + 1} · critique`
-    : parts && s.k ? `Part ${s.ti + 1} · Iteration ${s.k}` : "Iteration " + (s.iteration || 1);
-  const pre = s.kind === "intro" || s.kind === "rails";
+    : parts && s.k ? `Part ${s.ti + 1}: ${s.ti ? "the architect's critique" : "the AI meets the brief"} · iteration ${s.k}` : "Iteration " + (s.iteration || 1);
+  const pre = s.kind === "intro";
   $("ring").classList.toggle("hide", pre);
+  const feeding = s.kind === "rails" || (s.kind === "decision" && s.added.length);
+  $("ring").classList.toggle("input", !!feeding);
+  $("input").textContent = s.kind === "decision" && s.added.length ? `Architect's critique → ${s.added.length} new guardrails`
+    : s.kind === "rails" ? `The brief → ${rows.filter(r => !railTake.get(r.dataset.id)).length} guardrails` : "Input: the brief, then the architect";
+  $("ring").classList.toggle("closed", !!(s.at && s.kind !== "gen" && !hits(s.at) && !(s.kind === "check" && p < .98)));
   $("count").classList.toggle("hide", pre);
   // counter
   const c = $("count");
-  if (pre) { c.className = "hud hide"; }
+  if (pre || s.kind === "rails") { c.className = "hud idle"; $("cN").textContent = "–"; $("cL").textContent = "not checked yet"; $("cK").textContent = ""; }
   else if (s.kind === "gen" && !s.again && !s.from) { c.className = "hud idle"; $("cN").textContent = "–"; $("cL").textContent = "not checked yet"; $("cK").textContent = ""; }
   else if (s.kind === "gen") { c.className = "hud idle"; $("cL").textContent = "checking next…"; }
   else {
@@ -324,7 +360,8 @@ function hud(s, p) {
     const n = s.kind === "check" ? Math.round(prevH + (hits(f) - prevH) * ease(p)) : hits(f);
     c.className = "hud " + (n ? "bad" : "ok"); $("cN").textContent = n;
     $("cL").textContent = n ? `of ${f.guardrails.length} guardrails hit` : `all ${f.guardrails.length} guardrails met`;
-    $("cK").textContent = total(f) ? `${total(f)} of ${checks(f)} checks fail` : `${checks(f)} checks pass`;
+    $("cK").textContent = s.kind === "check" && n !== hits(f) ? "checking…"  // the totals only once the sweep reaches them
+      : total(f) ? `${total(f)} of ${checks(f)} checks fail` : `${checks(f)} checks pass`;
   }
   // caption
   let cap = "";
