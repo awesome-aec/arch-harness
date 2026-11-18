@@ -58,6 +58,9 @@ def pytest_generate_tests(metafunc):
         "corridor": [(s, s["id"]) for s in m["spaces"] if s["use"] == "corridor"],
         "room": [(s, s["id"]) for s in m["spaces"] if s["use"] == "room"],
         "side": [(s, "building:" + s) for s in ("west", "east", "south", "north")],
+        # an NSW site: the building against the LEP height the site states, each edge the site states
+        "nsw_building": [(m["building"], "building")] if "height_limit" in m["site"] else [],
+        "edge": [(e, f"{e['side']} {e['storeys']} storeys at {e['distance']}") for e in m["site"].get("edges", [])],
         "space_pair": [((a, b), f"{a['id']}|{b['id']}")
                        for spaces in by_storey.values() for a, b in itertools.combinations(spaces, 2)],
         "required_room": [(r, f"{r[0]}#{r[1]}") for r in required_rooms(m)],
@@ -74,6 +77,9 @@ def pytest_generate_tests(metafunc):
     for name, items in sources.items():
         if name in metafunc.fixturenames:
             marker = metafunc.definition.get_closest_marker("rule")
+            if marker is not None and marker.kwargs["kind"] == "code" and marker.kwargs.get("code", "MBO") != m["site"].get("code", "MBO"):
+                NOT_ASKED.add(metafunc.definition.name)  # another code's rule (geometry and brief run on every site)
+                items = []
             if not items and marker is not None and marker.kwargs.get("from_brief"):
                 NOT_ASKED.add(metafunc.definition.name)  # the brief states nothing to check: not run, not unconfirmed
             metafunc.parametrize(name, [i[0] for i in items], ids=[i[1] for i in items])

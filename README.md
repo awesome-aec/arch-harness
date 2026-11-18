@@ -24,7 +24,8 @@ DataDrivenAEC under the name ArchiLoops; nothing in this repository depends on t
    [plugin types](docs/plugin-contract.md):
    - **generators** turn intent into form (here: massing from the brief);
    - **rules** are pytest tests run after every step, each citing its source (here: DIN 18040-1 doors and
-     corridors, MBO § 6 Abstandsfläche, geometry sanity, brief conformance);
+     corridors, MBO § 6 Abstandsfläche, geometry sanity, brief conformance; on a site whose model names `code: NSW`,
+     the LEP height of buildings and the Apartment Design Guide's separation to boundaries instead of the German code rules);
    - **skills** describe design methods for the agent (Agent Skills format: `skills/`);
    - **data sources** bring open evidence into the design: public building records, carbon data such as
      ÖKOBAUDAT, local climate (here: one small local file of illustrative prices and carbon factors).

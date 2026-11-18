@@ -9,3 +9,10 @@ def abstandsflaeche(height: int) -> int:
 # Geometry sanity (arch-harness, not a code paragraph): two parallel walls leave at least a door's clear width
 # between their faces (DIN 18040-1 4.3.3.2: 90 cm), or the gap is a sliver nobody can enter or build.
 MIN_CLEAR_BETWEEN_WALLS = 900
+
+
+def adg_separation(storeys: int, lower_density: bool = False) -> int:
+    """NSW Apartment Design Guide (2015), Objective 3F-1 design criteria: minimum separation from habitable rooms and
+    balconies to side and rear boundaries: 6 m up to 12 m (4 storeys), 9 m up to 25 m (5-8 storeys), 12 m over 25 m (9+
+    storeys); design guidance: a further 3 m where the site adjoins a lower density zone. In mm."""
+    return (6000 if storeys <= 4 else 9000 if storeys <= 8 else 12000) + (3000 if lower_density else 0)

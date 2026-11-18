@@ -191,3 +191,41 @@ def test_a_room_far_above_its_programme_area_fails_when_the_brief_caps_it(model,
     report = run_rules(write_model(model))
     [f] = failures(report, "brief/room-not-oversized")
     assert f["element"] == "L0-S01" and f["data"] == {"actual_m2": 30.0, "max_m2": 25.0}
+
+
+def nsw(model, height_limit=None, edges=()):
+    """The tiny model on an NSW site: the code the site names decides which code rules run."""
+    model["site"].update({"code": "NSW", "edges": list(edges)})
+    if height_limit is not None:
+        model["site"]["height_limit"] = height_limit
+    return model
+
+
+def test_a_site_under_nsw_runs_the_nsw_rules_and_not_the_mbo(model, write_model):
+    report = run_rules(write_model(nsw(model, height_limit=22000, edges=[{"side": "west", "distance": 6000, "storeys": 4}])))
+    rules = {r["rule"] for r in report["results"]}
+    assert "NSW/LEP-4.3/building-height" in rules and "NSW/ADG-3F-1/separation-to-boundary" in rules
+    assert not any(r.startswith(("MBO", "DIN")) for r in rules)
+    assert {"geometry/opening-fits-wall", "brief/room-exists-at-area"} <= rules  # geometry and brief run on every site
+    assert failures(report) == []
+
+
+def test_a_german_site_runs_no_nsw_rule(model, write_model):
+    report = run_rules(write_model(model))
+    assert not any(r["rule"].startswith("NSW") for r in report["results"])
+
+
+def test_a_building_over_the_lep_height_fails_with_the_limit(model, write_model):
+    model["building"]["height"] = 31400
+    [f] = failures(run_rules(write_model(nsw(model, height_limit=28600))), "NSW/LEP-4.3/building-height")
+    assert f["data"] == {"actual": 31400, "required": 28600}
+
+
+def test_adg_separation_to_a_boundary_rises_with_storeys(model, write_model):
+    """ADG 3F-1: 6 m up to four storeys, 9 m for five to eight, 12 m from nine; plus 3 m next to a lower density zone."""
+    edges = [{"side": "west", "distance": 6000, "storeys": 4}, {"side": "east", "distance": 6000, "storeys": 5},
+             {"side": "north", "distance": 9000, "storeys": 8, "lower_density": True},
+             {"side": "south", "distance": 11000, "storeys": 9}]
+    got = {f["element"]: f["data"]["required"] for f in failures(run_rules(write_model(nsw(model, edges=edges))),
+                                                                 "NSW/ADG-3F-1/separation-to-boundary")}
+    assert got == {"east 5 storeys at 6000": 9000, "north 8 storeys at 9000": 12000, "south 9 storeys at 11000": 12000}
